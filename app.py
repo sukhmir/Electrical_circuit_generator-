@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import streamlit as st
 from openai import OpenAI
 
-client = OpenAI(api_key=st.secrets["GEMINI_API_KEY"])
+client = OpenAI(api_key=st.secrets["GPT_API_KEY"])
 
 # Streamlit UI
 st.set_page_config(page_title="⚡ Circuit Generator", layout="centered")
