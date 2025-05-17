@@ -1,14 +1,13 @@
 import streamlit as st
 import json
-from openai import OpenAI
+import requests
 from PIL import Image, ImageDraw, ImageFont
 import io
 import numpy as np
 import matplotlib.pyplot as plt
-import streamlit as st
-from openai import OpenAI
-
-client = OpenAI(api_key=st.secrets["GPT_API_KEY"])
+# Your Groq API Key
+GROQ_API_KEY = st.secrets["groq_api_key"]# Replace this with your key
+GROQ_MODEL = "llama3-70b-8192"
 
 # Streamlit UI
 st.set_page_config(page_title="⚡ Circuit Generator", layout="centered")
@@ -23,7 +22,7 @@ frequency = st.text_input("Frequency (Hz)", "50Hz")
 power_supply = st.text_input("Power Supply Values", "+5V DC")
 
 if st.button("Generate Circuit") and circuit_name:
-    with st.spinner("Generating with GPT-4..."):
+    with st.spinner("Generating with Groq..."):
         try:
             system_msg = """
 You are an expert in electrical circuit design. When asked to generate a circuit:
@@ -47,15 +46,24 @@ Only output this JSON. Do not explain anything.
                 "Output JSON with 'components' and 'diagram'."
             )
 
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
+            headers = {
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": GROQ_MODEL,
+                "messages": [
                     {"role": "system", "content": system_msg},
                     {"role": "user", "content": user_msg}
                 ]
-            )
+            }
 
-            content = response.choices[0].message.content.strip()
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
+            res.raise_for_status()
+            response_json = res.json()
+            content = response_json["choices"][0]["message"]["content"].strip()
+
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0]
 
@@ -64,10 +72,10 @@ Only output this JSON. Do not explain anything.
             diagram = result.get("diagram", "Diagram missing.")
 
         except Exception as e:
-            st.error(f"❌ Error parsing GPT response: {str(e)}")
+            st.error(f"❌ Error parsing Groq response: {str(e)}")
             st.stop()
 
-    # ✅ Display
+    # ✅ Display Components & Diagram
     st.subheader("🧩 Components")
     st.json(components)
 
@@ -81,7 +89,7 @@ Only output this JSON. Do not explain anything.
         max_width = max([len(line) for line in lines])
         padding = 20
         line_height = 15
-        width = padding * 2 + max_width * 2
+        width = padding * 2 + max_width * 1
         height = padding * 2 + len(lines) * line_height
         img = Image.new("RGB", (width, height), "white")
         draw = ImageDraw.Draw(img)
@@ -113,7 +121,6 @@ Only output this JSON. Do not explain anything.
             value = comp["value"]
             st.markdown(f"### 🔹 {name} - {comp['type']} ({value})")
 
-            # Convert value string to float
             try:
                 if "k" in value:
                     val = float(value.replace("k", "").replace("Ω", "").strip()) * 1e3
@@ -140,7 +147,7 @@ Only output this JSON. Do not explain anything.
                 v = np.cumsum(i) * (t[1] - t[0]) / c
             elif "inductor" in ctype:
                 l = val
-                i = vin_wave / 1  # Assume 1 Ohm load
+                i = vin_wave / 1
                 v = l * np.gradient(i, t[1] - t[0])
             else:
                 st.info("🛠 Component type not supported for waveform.")

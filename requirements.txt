@@ -1,5 +1,5 @@
 streamlit
-openai
-Pillow
-numpy
+requests
+pillow
 matplotlib
+numpy
